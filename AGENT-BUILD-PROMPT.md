@@ -67,7 +67,7 @@ Recon them from: public marketing and pricing pages, real studios' public class-
 - **Never** scrape behind a login, and never use anyone else's account or credentials.
 - If a flow cannot be observed publicly, design your own and log the decision.
 - Rebuild the *job* it does, in your own design system, with your own assets and your own words.
-- `Recon the **member booking flow and the checkout** closely, and study the pricing pages for how incumbents stack subscription + transaction fees. The PRD's honest position is that the fee delta is ~1% of processed volume — build to that truth, do not inflate it.`
+- Recon the **member booking flow and the checkout** closely, and study the pricing pages for how incumbents stack subscription + transaction fees. The PRD's honest position is that the fee delta is ~1% of processed volume — build to that truth, do not inflate it.
 
 ## 6. Skill order
 
@@ -95,7 +95,7 @@ Python helpers are stdlib-only: `python3 .claude/skills/replica-design/contrast.
 - **Never type, generate or store passwords, card numbers, or live API keys.** Write `.env.example` with variable names and no values. The human fills `.env.local` (already gitignored).
 - Use **test mode** for every payment provider. Never send real emails, SMS or charges to real people.
 - Keep all generated artefacts under `replica/`.
-- `**Never take a percentage of a studio's payments.** Assert in code and in tests that no platform/application fee is ever set on a payment intent (F3). Also keep the member experience installable and usable at 375px (F10).`
+- **Never take a percentage of a studio's payments.** Assert in code and in tests that no platform/application fee is ever set on a payment intent (F3). Also keep the member experience installable and usable at 375px (F10).
 - Prefer boring, well-supported choices over novel ones. You are optimising for a product that survives, not a demo that impresses.
 
 ## 8. Final report — write `replica/FINAL-REPORT.md`
