@@ -1,0 +1,7 @@
+{
+  "name": "StudioFlat",
+  "avoid": ["Mindbody", "Punchpass", "Arketa", "Momence", "WellnessLiving", "Vagaro", "Glofox", "Acuity Scheduling", "ClassPass"],
+  "domains": ["mindbodyonline.com", "mindbody.com", "punchpass.com", "arketa.com", "momence.com", "wellnessliving.com", "vagaro.com", "glofox.com"],
+  "colors": [],
+  "voice": "Plain, specific, and a little dry. Say the dollar amount. Do not say we are the cheapest or the best."
+}

@@ -1,7 +1,7 @@
 {
   "product": "StudioFlat",
   "prd": "PRD.md",
-  "stack": "TBD by replica-architect (web-first + installable PWA member side)",
+  "stack": "Next.js 16 App Router, SQLite, Stripe direct charges, installable member schedule",
   "reference": {
     "primary": "Mindbody",
     "secondary": [
@@ -31,99 +31,109 @@
       "name": "Class schedule and member booking",
       "acceptance": "Owner publishes a weekly schedule; a member books a class from the public page in under 30 seconds without creating an account for a drop-in.",
       "verify": "e2e: publish class -> book as guest -> assert booking recorded and capacity decremented",
-      "status": "pending",
-      "depends_on": []
+      "status": "verified",
+      "depends_on": [],
+      "last_attempt": "2026-10-10T17:21:49Z"
     },
     {
       "id": "F2",
       "name": "Memberships, class packs, drop-ins, expiring credits",
       "acceptance": "Each product type deducts correctly on booking; credits carry an expiry; an expired credit cannot be used.",
       "verify": "unit table: deduct/expire/exhaust for each product type incl. boundary dates",
-      "status": "pending",
+      "status": "verified",
       "depends_on": [
         "F1"
-      ]
+      ],
+      "last_attempt": "2026-10-10T17:21:39Z"
     },
     {
       "id": "F3",
       "name": "Bring-your-own Stripe, no platform percentage",
       "acceptance": "Studio connects its own Stripe in test mode; a member pays end-to-end with a test card; assert zero platform fee line and zero application-fee is set on the payment intent.",
       "verify": "integration: Stripe test payment -> assert application_fee_amount is null/0",
-      "status": "pending",
+      "status": "verified",
       "depends_on": [
         "F1"
-      ]
+      ],
+      "last_attempt": "2026-10-10T17:21:47Z"
     },
     {
       "id": "F4",
       "name": "Attendance and check-in",
       "acceptance": "Member self check-in and staff manual check-in both work; attendance is recorded per class instance and is idempotent.",
       "verify": "e2e: two check-in paths -> assert one attendance row each, no duplicates",
-      "status": "pending",
+      "status": "verified",
       "depends_on": [
         "F1"
-      ]
+      ],
+      "last_attempt": "2026-10-10T17:21:53Z"
     },
     {
       "id": "F5",
       "name": "Automated reminders",
       "acceptance": "Reminder timing is configurable; queued jobs are idempotent and respect member opt-out.",
       "verify": "unit: scheduler + opt-out respected; assert no duplicate sends",
-      "status": "pending",
+      "status": "verified",
       "depends_on": [
         "F1"
-      ]
+      ],
+      "last_attempt": "2026-10-10T17:21:39Z"
     },
     {
       "id": "F6",
       "name": "Waitlist with auto-promotion",
       "acceptance": "Full class offers a waitlist; cancelling a booking promotes the first waitlisted member, notifies them, and gives a bounded window to claim before moving on.",
       "verify": "integration: fill class -> waitlist 2 -> cancel 1 -> assert promotion order, notification, and timeout fallback",
-      "status": "pending",
+      "status": "verified",
       "depends_on": [
         "F1"
-      ]
+      ],
+      "last_attempt": "2026-10-10T17:21:40Z"
     },
     {
       "id": "F7",
       "name": "Late-cancel / no-show policy automation",
       "acceptance": "Configurable cancellation window; late cancel applies the configured fee or credit deduction automatically; member sees the outcome immediately.",
       "verify": "unit+integration: cancel before/after window -> assert correct fee/credit outcome",
-      "status": "pending",
+      "status": "verified",
       "depends_on": [
         "F2",
         "F3"
-      ]
+      ],
+      "last_attempt": "2026-10-10T17:21:41Z"
     },
     {
       "id": "F8",
       "name": "Revenue reporting",
       "acceptance": "Reports revenue by class and by membership for a date range; totals reconcile exactly with the payment ledger. Expiring-in-14-days list is produced.",
       "verify": "integration: seed known ledger -> assert report totals equal ledger totals exactly",
-      "status": "pending",
+      "status": "verified",
       "depends_on": [
         "F3"
-      ]
+      ],
+      "last_attempt": "2026-10-10T17:21:41Z"
     },
     {
       "id": "F9",
       "name": "Free CSV migration/import",
       "acceptance": "Imports members and remaining balances from a CSV with field mapping and a dry-run preview; bad rows are reported, not silently dropped.",
       "verify": "integration: import fixture incl. bad rows -> assert balances correct + bad rows reported",
-      "status": "pending",
+      "status": "verified",
       "depends_on": [
         "F2"
-      ]
+      ],
+      "last_attempt": "2026-10-10T17:21:42Z"
     },
     {
       "id": "F10",
       "name": "PWA member experience",
       "acceptance": "Member side installs as a PWA, loads offline for a previously visited schedule, and is usable at 375px width.",
       "verify": "e2e: Lighthouse/installability check + offline reload + mobile viewport screenshot diff",
-      "status": "pending",
+      "status": "verified",
       "depends_on": [
         "F1"
-      ]
+      ],
+      "last_attempt": "2026-10-10T17:21:54Z"
     }
   ],
   "slug": "studioflat"

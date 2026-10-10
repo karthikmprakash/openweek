@@ -16,7 +16,17 @@ node_modules/
 .next/
 dist/
 build/
+*.tsbuildinfo
 
 # OS / editor
 .DS_Store
 *.log
+
+# Local databases and Playwright output
+data/
+test-results/
+playwright-report/
+blob-report/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

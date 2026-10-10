@@ -1,0 +1,34 @@
+:root {
+  --bg: #f6f3ec;
+  --surface: #fffcf7;
+  --border: #e4dcd0;
+  --border-input: #4e5a54;
+  --text: #1a1916;
+  --text-muted: #3e4a44;
+  --accent: #0b3d3b;
+  --on-accent: #ffffff;
+  --danger: #8e1d2c;
+  --success: #0d5c34;
+  --warning: #7a3e06;
+  --font-sans: "Source Sans 3", "Segoe UI", sans-serif;
+  --font-serif: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 2px rgba(26, 25, 22, 0.06), 0 1px 3px rgba(26, 25, 22, 0.08);
+  --shadow-pop: 0 12px 32px rgba(26, 25, 22, 0.14);
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --header-h: 64px;
+  --content: 1080px;
+}

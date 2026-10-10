@@ -1,0 +1,48 @@
+feature,area,priority,original,clone,notes
+Weekly class schedule the owner can publish,schedule,must,yes,yes,F1
+Guest drop-in booking without creating an account,booking,must,yes,yes,F1
+Capacity decrements when a spot is reserved,booking,must,yes,yes,F1
+Class packs with a remaining-credit balance,products,must,yes,yes,F2
+Unlimited memberships with an end date,products,must,yes,yes,F2
+Single drop-in credit that expires,products,must,yes,yes,F2
+Expired credit cannot be spent,products,must,yes,yes,F2
+Studio connects its own Stripe account,payments,must,yes,yes,F3
+Card payment for a drop-in,payments,must,yes,yes,F3
+No platform percentage on any payment,payments,must,yes,yes,F3
+Member self check-in,attendance,must,yes,yes,F4
+Staff manual check-in,attendance,must,yes,yes,F4
+Check-in is idempotent per booking,attendance,must,yes,yes,F4
+Configurable reminder lead time,reminders,must,yes,yes,F5
+Reminder jobs do not double-send,reminders,must,yes,yes,F5
+Member can opt out of reminders,reminders,must,yes,yes,F5
+Waitlist when a class is full,waitlist,must,yes,yes,F6
+Cancel promotes the first person waiting,waitlist,must,yes,yes,F6
+Promoted member has a bounded claim window,waitlist,must,yes,yes,F6
+Unclaimed offer moves to the next person,waitlist,must,yes,yes,F6
+Configurable cancellation window,policy,must,yes,yes,F7
+Late cancel applies a fee or a credit rule,policy,must,yes,yes,F7
+Member sees the policy outcome immediately,policy,must,yes,yes,F7
+No-show uses the same policy engine,policy,should,yes,yes,F7
+Revenue by class for a date range,reports,must,yes,yes,F8
+Revenue by membership for a date range,reports,must,yes,yes,F8
+Report totals match the payment ledger,reports,must,yes,yes,F8
+Credits expiring within 14 days,reports,must,yes,yes,F8
+One-tap email to people with expiring credits,reports,should,yes,yes,F8
+CSV import with column mapping,import,must,yes,yes,F9
+Dry-run preview before import,import,must,yes,yes,F9
+Bad rows reported and not inserted,import,must,yes,yes,F9
+Installable member schedule,pwa,must,yes,yes,F10
+Previously opened schedule reloads offline,pwa,must,yes,yes,F10
+Booking flow usable at 375px,pwa,must,yes,yes,F10
+Owner email login and session,auth,must,yes,yes,needed to publish a schedule
+Second studio cannot read the first studio's rows,auth,must,yes,yes,tenancy
+Branded native consumer app,mobile,could,yes,skip,PRD excludes it; installable site instead
+Consumer marketplace of studios,marketplace,could,yes,skip,the reference's network is not ours to copy
+Payroll and instructor commission,backoffice,could,yes,skip,out of MVP scope
+Retail POS and inventory,backoffice,could,yes,skip,out of MVP scope
+Door-access hardware,backoffice,could,yes,skip,out of MVP scope
+Marketing funnels and campaigns,marketing,could,yes,skip,out of MVP scope
+Franchise and multi-location hierarchy,tenancy,could,yes,skip,out of MVP scope
+Platform-owned payment processing,payments,could,yes,skip,the product refuses a platform fee
+Dynamic pricing and intro-offer engine,pricing,could,yes,skip,not in the MVP jobs
+AI front desk,support,could,yes,skip,not observed as a job we need to rebuild
