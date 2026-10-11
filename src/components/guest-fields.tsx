@@ -36,6 +36,8 @@ export function GuestFields({ defaultName = "", defaultEmail = "" }: { defaultNa
     const saved = readSaved();
     if (saved?.name && name && !name.value) name.value = saved.name;
     if (saved?.email && email && !email.value) email.value = saved.email;
+    // localStorage is only readable after mount; keep first paint identical on the server.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate remembered guest after mount
     if (saved?.name || saved?.email) setRemembered(true);
     const save = () => writeSaved({ name: name?.value.trim(), email: email?.value.trim() });
     form.addEventListener("submit", save);
