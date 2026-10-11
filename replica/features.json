@@ -1,5 +1,5 @@
 {
-  "product": "StudioFlat",
+  "product": "Openweek",
   "prd": "PRD.md",
   "stack": "Next.js 16 App Router, SQLite, Stripe direct charges, installable member schedule",
   "reference": {
@@ -136,5 +136,5 @@
       "last_attempt": "2026-10-10T17:21:54Z"
     }
   ],
-  "slug": "studioflat"
+  "slug": "openweek"
 }

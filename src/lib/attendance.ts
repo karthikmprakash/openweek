@@ -1,6 +1,17 @@
 import type { Db } from "./db";
 import { getBooking } from "./booking";
 import { DomainError } from "./errors";
+import { getSession } from "./schedule";
+
+export const SELF_CHECK_IN_OPENS_MIN = 60;
+
+/** Members can tap "I'm here" from an hour before class until it ends. */
+export function selfCheckInWindow(session: { starts_at: string; ends_at: string }): { opensAt: Date; closesAt: Date } {
+  return {
+    opensAt: new Date(new Date(session.starts_at).getTime() - SELF_CHECK_IN_OPENS_MIN * 60 * 1000),
+    closesAt: new Date(session.ends_at),
+  };
+}
 
 export type AttendanceRow = {
   id: string;
@@ -33,6 +44,16 @@ export function checkIn(
   const existing = db.prepare(`SELECT * FROM attendance WHERE booking_id = ?`).get(booking.id) as AttendanceRow | undefined;
   if (existing) return existing;
 
+  if (input.method === "self") {
+    const session = getSession(db, booking.session_id);
+    if (!session) throw new DomainError("The class for this booking is gone.", "not_found");
+    const window = selfCheckInWindow(session);
+    if (now < window.opensAt) {
+      throw new DomainError(`Check-in opens ${SELF_CHECK_IN_OPENS_MIN} minutes before class.`, "too_early");
+    }
+    if (now > window.closesAt) throw new DomainError("This class has ended. Ask the studio to check you in.", "too_late");
+  }
+
   const id = crypto.randomUUID();
   db.prepare(
     `INSERT INTO attendance (id, booking_id, session_id, studio_id, method, checked_in_at) VALUES (?, ?, ?, ?, ?, ?)`,
@@ -43,31 +64,6 @@ export function checkIn(
 
 export function attendanceForBooking(db: Db, bookingId: string): AttendanceRow | null {
   return (db.prepare(`SELECT * FROM attendance WHERE booking_id = ?`).get(bookingId) as AttendanceRow | undefined) ?? null;
-}
-
-export function roster(db: Db, studioId: string, now: Date) {
-  const from = new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString();
-  return db
-    .prepare(
-      `SELECT b.id, b.guest_name, b.guest_email, b.status, c.name AS class_name, s.starts_at,
-              a.method AS method, a.id AS attendance_id
-       FROM bookings b
-       JOIN class_sessions s ON s.id = b.session_id
-       JOIN class_types c ON c.id = s.class_type_id
-       LEFT JOIN attendance a ON a.booking_id = b.id
-       WHERE b.studio_id = ? AND s.starts_at >= ? AND b.status IN ('confirmed', 'attended')
-       ORDER BY s.starts_at ASC, b.guest_name ASC`,
-    )
-    .all(studioId, from) as Array<{
-    id: string;
-    guest_name: string;
-    guest_email: string;
-    status: string;
-    class_name: string;
-    starts_at: string;
-    method: "self" | "staff" | null;
-    attendance_id: string | null;
-  }>;
 }
 
 export function listAttendance(db: Db, studioId: string, sessionId: string): AttendanceRow[] {

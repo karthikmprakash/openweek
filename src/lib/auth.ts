@@ -1,6 +1,7 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import type { Db } from "./db";
 import { DomainError } from "./errors";
+import { isValidTimeZone } from "./time";
 
 export type StaffContext = {
   staffId: string;
@@ -58,6 +59,9 @@ export function createStudioAccount(
   }
   if (input.studioName.trim().length < 2) {
     throw new DomainError("Add the studio name.", "name");
+  }
+  if (input.timezone && !isValidTimeZone(input.timezone)) {
+    throw new DomainError("Pick a time zone from the list.", "timezone");
   }
   const studioId = crypto.randomUUID();
   const staffId = crypto.randomUUID();

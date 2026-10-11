@@ -1,4 +1,4 @@
-# Architecture: StudioFlat
+# Architecture: Openweek
 
 A single Next.js app. One SQLite file. No microservices.
 

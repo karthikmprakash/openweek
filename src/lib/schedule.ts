@@ -1,6 +1,6 @@
 import type { Db } from "./db";
 import { DomainError } from "./errors";
-import { addMinutes } from "./time";
+import { addMinutes, isValidTimeZone, shiftYmd, zonedLocalToUtc } from "./time";
 
 export type Studio = {
   id: string;
@@ -15,6 +15,8 @@ export type Studio = {
   waitlist_claim_minutes: number;
   reminder_lead_hours: number;
   stripe_account_id: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type ClassSession = {
@@ -57,8 +59,24 @@ export function updatePolicies(
   },
   now: Date,
 ): void {
-  if (!Number.isFinite(input.cancellationWindowHours) || input.cancellationWindowHours < 0) {
-    throw new DomainError("Cancellation window must be zero or more hours.", "policy");
+  const whole = (value: number, min: number, max: number) => Number.isInteger(value) && value >= min && value <= max;
+  if (!whole(input.cancellationWindowHours, 0, 168)) {
+    throw new DomainError("Set the free cancellation window between 0 and 168 hours.", "policy");
+  }
+  if (!whole(input.waitlistClaimMinutes, 5, 1440)) {
+    throw new DomainError("Give waitlisted members between 5 and 1440 minutes to claim a spot.", "policy");
+  }
+  if (!whole(input.reminderLeadHours, 0, 168)) {
+    throw new DomainError("Send reminders between 0 and 168 hours before class.", "policy");
+  }
+  if (!Number.isInteger(input.lateCancelFeeCents) || input.lateCancelFeeCents < 0) {
+    throw new DomainError("The late cancel fee can't be negative.", "policy");
+  }
+  if (!Number.isInteger(input.noShowFeeCents) || input.noShowFeeCents < 0) {
+    throw new DomainError("The no-show fee can't be negative.", "policy");
+  }
+  if (!isValidTimeZone(input.timezone)) {
+    throw new DomainError("Pick a time zone from the list.", "timezone");
   }
   db.prepare(
     `UPDATE studios SET
@@ -170,6 +188,45 @@ export function addSession(
     now.toISOString(),
   );
   return id;
+}
+
+export const MAX_REPEAT_WEEKS = 12;
+
+/** Add the same class at the same local time once a week. DST shifts keep the wall-clock time. */
+export function addWeeklySessions(
+  db: Db,
+  input: {
+    studioId: string;
+    classTypeId: string;
+    firstLocal: string;
+    timeZone: string;
+    weeks: number;
+    instructorName?: string;
+  },
+  now: Date,
+): string[] {
+  const weeks = Math.trunc(input.weeks);
+  if (!Number.isFinite(weeks) || weeks < 1 || weeks > MAX_REPEAT_WEEKS) {
+    throw new DomainError(`Repeat for 1 to ${MAX_REPEAT_WEEKS} weeks.`, "repeat");
+  }
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(input.firstLocal);
+  if (!match) throw new DomainError("Pick a date and start time.", "starts_at");
+  const first = zonedLocalToUtc(input.firstLocal, input.timeZone);
+  if (first <= now) throw new DomainError("Pick a start time in the future.", "starts_at");
+  return db.transaction(() =>
+    Array.from({ length: weeks }, (_, index) =>
+      addSession(
+        db,
+        {
+          studioId: input.studioId,
+          classTypeId: input.classTypeId,
+          startsAt: zonedLocalToUtc(`${shiftYmd(match[1], index * 7)}T${match[2]}`, input.timeZone),
+          instructorName: input.instructorName,
+        },
+        now,
+      ),
+    ),
+  )();
 }
 
 export function listSessions(db: Db, studioId: string, fromIso: string, toIso: string): ClassSession[] {

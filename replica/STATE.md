@@ -20,9 +20,9 @@ done (10/10 verified, tools/verify.sh exit 0)
 - (deploy: only once the human supplies a domain)
 
 ## Last session summary
-All ten features verified. verify.sh passed. Final report is replica/FINAL-REPORT.md. Not deployed.
+Shipped product mark is **Openweek** (landing, auth, studio chrome, member footer, PWA, emails in payments copy). Owner “studio” routes and tables are unchanged. Official trademark searches still to run (`replica/brand.md`).
 
 ## Next 3 concrete actions
-1. Add a Stripe test secret and run one live PaymentIntent.
-2. Add a calendar file on the confirmation.
+1. Finish USPTO / EUIPO / CIPO / WIPO searches for Openweek.
+2. Add a Stripe test secret and run one live PaymentIntent.
 3. Bill the studio $29 or $49 with a one-click cancel, still with no platform percentage.

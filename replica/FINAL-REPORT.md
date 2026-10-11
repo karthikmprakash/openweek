@@ -1,4 +1,4 @@
-# StudioFlat final report
+# Openweek final report
 
 2026-10-10. `tools/verify.sh` exited 0. All 10 features are `verified`.
 
@@ -55,7 +55,7 @@ npm run build
 npm start
 ```
 
-App: http://127.0.0.1:3000. Create a studio at `/signup`. Database: `data/studioflat.db` (override with `STUDIOFLAT_DB`).
+App: http://127.0.0.1:3000. Create a studio at `/signup`. Database: `data/openweek.db` (override with `OPENWEEK_DB`).
 
 ```bash
 npm run test:unit
@@ -75,7 +75,7 @@ Playwright starts `next start` on port 3456 and needs the production build. Copy
 - One staff email can own only one studio.
 - A paid drop-in with no pass cannot be reserved until the card path runs. If Stripe is unset, that button fails with a clear error. Free classes and passes work.
 - The service worker caches the schedule only after it controls the page. The first visit is online.
-- Trademark, domain, and store-name checks for StudioFlat were not run.
+- Trademark, domain, and store-name checks for Openweek are in `replica/brand.md`. Official office searches still to run.
 - No calendar invite file and no Google Calendar sync, which showed up in the reviews.
 - The owner UI is usable, not polished. Long names wrap. There is no instructor permission split beyond the role column.
 

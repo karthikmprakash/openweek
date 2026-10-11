@@ -1,4 +1,4 @@
-const CACHE = "studioflat-schedule-v1";
+const CACHE = "openweek-schedule-v1";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());

@@ -40,13 +40,13 @@ export function paymentIntentCreateParams(req: ChargeRequest): Stripe.PaymentInt
 export function assertParamsHaveNoPlatformFee(params: Stripe.PaymentIntentCreateParams): void {
   const record = params as unknown as Record<string, unknown>;
   if (record.application_fee_amount != null && record.application_fee_amount !== 0) {
-    throw new DomainError("StudioFlat never adds a platform fee.", "platform_fee");
+    throw new DomainError("Openweek never adds a platform fee.", "platform_fee");
   }
   if ("application_fee_amount" in record && record.application_fee_amount) {
-    throw new DomainError("StudioFlat never adds a platform fee.", "platform_fee");
+    throw new DomainError("Openweek never adds a platform fee.", "platform_fee");
   }
   if (record.application_fee != null) {
-    throw new DomainError("StudioFlat never adds a platform fee.", "platform_fee");
+    throw new DomainError("Openweek never adds a platform fee.", "platform_fee");
   }
 }
 

@@ -44,18 +44,12 @@ export function revenueReport(db: Db, studioId: string, fromIso: string, toIso: 
     )
     .all(studioId, fromIso, toIso) as PaymentJoin[];
 
-  const ledger = db
-    .prepare(
-      `SELECT COALESCE(SUM(amount_cents), 0) AS total
-       FROM payments
-       WHERE studio_id = ? AND created_at >= ? AND created_at < ? AND status IN ('succeeded', 'refunded')`,
-    )
-    .get(studioId, fromIso, toIso) as { total: number };
-
   const classes = new Map<string, MoneyRow>();
   const memberships = new Map<string, MoneyRow>();
   let other = 0;
+  let ledgerTotalCents = 0;
   for (const row of rows) {
+    ledgerTotalCents += row.amount_cents;
     if (row.product_kind === "membership" && row.product_id) {
       const current = memberships.get(row.product_id) ?? { id: row.product_id, name: row.product_name ?? "Membership", amountCents: 0 };
       current.amountCents += row.amount_cents;
@@ -79,7 +73,7 @@ export function revenueReport(db: Db, studioId: string, fromIso: string, toIso: 
     byMembership,
     otherCents: other,
     groupedTotalCents: grouped,
-    ledgerTotalCents: ledger.total,
+    ledgerTotalCents,
   };
 }
 

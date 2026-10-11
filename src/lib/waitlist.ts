@@ -151,3 +151,22 @@ export function listWaitlist(db: Db, studioId: string, sessionId: string): Waitl
     .prepare(`SELECT * FROM waitlist WHERE studio_id = ? AND session_id = ? ORDER BY position ASC`)
     .all(studioId, sessionId) as WaitlistRow[];
 }
+
+export function waitlistForEmail(db: Db, studioId: string, sessionId: string, email: string): WaitlistRow | null {
+  return (
+    (db
+      .prepare(
+        `SELECT * FROM waitlist WHERE studio_id = ? AND session_id = ? AND guest_email = ? AND status IN ('waiting', 'offered')`,
+      )
+      .get(studioId, sessionId, email.trim().toLowerCase()) as WaitlistRow | undefined) ?? null
+  );
+}
+
+export function listActiveWaitlistForEmail(db: Db, studioId: string, email: string) {
+  return db
+    .prepare(
+      `SELECT session_id, position, status FROM waitlist
+       WHERE studio_id = ? AND guest_email = ? AND status IN ('waiting', 'offered')`,
+    )
+    .all(studioId, email.trim().toLowerCase()) as Array<{ session_id: string; position: number; status: string }>;
+}

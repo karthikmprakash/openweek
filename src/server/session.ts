@@ -1,13 +1,14 @@
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { staffFromToken, type StaffContext } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 
-export async function currentStaff(): Promise<StaffContext | null> {
+export const currentStaff = cache(async (): Promise<StaffContext | null> => {
   const jar = await cookies();
   const token = jar.get("sf_session")?.value;
   if (!token) return null;
   return staffFromToken(getDb(), token, new Date());
-}
+});
 
 export async function writeSession(token: string) {
   const jar = await cookies();

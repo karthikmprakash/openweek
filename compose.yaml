@@ -1,0 +1,72 @@
+name: openweek
+
+services:
+  app:
+    image: ghcr.io/karthikmprakash/openweek:${OPENWEEK_TAG:-latest}
+    build:
+      context: .
+      args:
+        APP_VERSION: ${APP_VERSION:-0.1.0}
+    restart: unless-stopped
+    init: true
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+      OPENWEEK_DB: /data/openweek.db
+      COOKIE_SECURE: ${COOKIE_SECURE:-}
+      JOB_SECRET: ${JOB_SECRET:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      APP_VERSION: ${APP_VERSION:-0.1.0}
+    volumes:
+      - openweek-data:/data
+      - ./backups:/backups
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+
+  jobs:
+    image: curlimages/curl:8.16.0
+    restart: unless-stopped
+    init: true
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      JOB_SECRET: ${JOB_SECRET:-}
+      JOB_INTERVAL: ${JOB_INTERVAL:-300}
+    command:
+      - sh
+      - -c
+      - |
+        while true; do
+          if [ -n "$$JOB_SECRET" ]; then
+            curl -fsS -X POST -H "x-job-secret: $$JOB_SECRET" http://app:3000/api/jobs/run || true
+          fi
+          sleep $${JOB_INTERVAL:-300}
+        done
+
+volumes:
+  openweek-data:

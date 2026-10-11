@@ -20,8 +20,8 @@ test("member schedule is installable, offline, and usable at 375px", async ({ pa
     const sizes = (manifest.icons ?? []).map((icon: { sizes?: string }) => icon.sizes);
     return {
       ok:
-        manifest.name === "StudioFlat" &&
-        manifest.short_name === "StudioFlat" &&
+        manifest.name === "Openweek" &&
+        manifest.short_name === "Openweek" &&
         manifest.display === "standalone" &&
         typeof manifest.start_url === "string" &&
         sizes.includes("192x192") &&

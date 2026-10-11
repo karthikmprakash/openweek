@@ -11,6 +11,11 @@ export function openDatabase(filename: string): Db {
   }
   const db = new Database(filename);
   db.pragma("journal_mode = WAL");
+  db.pragma("synchronous = NORMAL");
+  db.pragma("busy_timeout = 5000");
+  db.pragma("temp_store = MEMORY");
+  db.pragma("cache_size = -64000");
+  db.pragma("mmap_size = 268435456");
   db.pragma("foreign_keys = ON");
   db.exec(SCHEMA_SQL);
   return db;
@@ -20,7 +25,10 @@ let singleton: Db | null = null;
 
 export function getDb(): Db {
   if (singleton) return singleton;
-  const file = process.env.STUDIOFLAT_DB ?? path.join(process.cwd(), "data", "studioflat.db");
+  const fromEnv = process.env.OPENWEEK_DB ?? process.env.STUDIOFLAT_DB;
+  const next = path.join(process.cwd(), "data", "openweek.db");
+  const previous = path.join(process.cwd(), "data", "studioflat.db");
+  const file = fromEnv ?? (!fs.existsSync(next) && fs.existsSync(previous) ? previous : next);
   singleton = openDatabase(file);
   return singleton;
 }

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { bookGuest, spotsLeft } from "../src/lib/booking";
+import { bookGuest, getActiveBookingForEmail, spotsLeft } from "../src/lib/booking";
 import { DomainError } from "../src/lib/errors";
 import { zonedLocalToUtc } from "../src/lib/time";
 import { classOn, studioFixture, tempDb } from "./helpers";
@@ -45,6 +45,8 @@ describe("guest booking", () => {
     expect(() =>
       bookGuest(handle.db, { studioId: studio.studioId, sessionId, guestName: "Avery Lane", guestEmail: "avery@example.test" }, now),
     ).toThrow(DomainError);
+    const existing = getActiveBookingForEmail(handle.db, sessionId, "Avery@example.test");
+    expect(existing?.guest_email).toBe("avery@example.test");
   });
 
   it("hides another studio's sessions", () => {

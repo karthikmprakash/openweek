@@ -1,4 +1,4 @@
-# PRD — "StudioFlat": flat-fee class booking for micro studios (<150 members)
+# PRD — "Openweek": flat-fee class booking for micro studios (<150 members)
 
 **Target price:** $29–49/mo flat, plus bring-your-own payment processing
 **Status:** researched hypothesis · **Evidence strength:** real demand, **but this is the weakest of the three verticals to enter** — see §7

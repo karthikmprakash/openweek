@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS class_sessions (
   CHECK (ends_at > starts_at)
 );
 CREATE INDEX IF NOT EXISTS sessions_studio_start ON class_sessions (studio_id, starts_at);
+CREATE INDEX IF NOT EXISTS sessions_studio_status_start ON class_sessions (studio_id, status, starts_at);
 
 CREATE TABLE IF NOT EXISTS products (
   id TEXT PRIMARY KEY,
@@ -129,6 +130,7 @@ CREATE TABLE IF NOT EXISTS bookings (
 );
 CREATE INDEX IF NOT EXISTS bookings_session ON bookings (session_id, status);
 CREATE INDEX IF NOT EXISTS bookings_studio ON bookings (studio_id, created_at);
+CREATE INDEX IF NOT EXISTS bookings_studio_email ON bookings (studio_id, guest_email, status);
 CREATE UNIQUE INDEX IF NOT EXISTS bookings_one_active
   ON bookings (session_id, guest_email)
   WHERE status IN ('confirmed', 'offer_pending', 'attended', 'no_show');
@@ -176,6 +178,7 @@ CREATE TABLE IF NOT EXISTS waitlist (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS waitlist_session ON waitlist (session_id, status, position);
+CREATE INDEX IF NOT EXISTS waitlist_studio_email ON waitlist (studio_id, guest_email, status);
 CREATE UNIQUE INDEX IF NOT EXISTS waitlist_one_open
   ON waitlist (session_id, guest_email)
   WHERE status IN ('waiting', 'offered');

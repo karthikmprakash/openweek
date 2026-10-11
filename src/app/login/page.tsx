@@ -1,26 +1,35 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import { Brand, Field, Flash } from "@/components/ui";
+import { redirect } from "next/navigation";
+import { ActionForm, SubmitButton } from "@/components/forms";
+import { Brand, Field } from "@/components/ui";
 import { loginAction } from "@/server/actions";
+import { currentStaff } from "@/server/session";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Log in" };
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const query = await searchParams;
+export default async function LoginPage() {
+  if (await currentStaff()) redirect("/studio");
   return (
-    <main id="main" className="wrap page" style={{ maxWidth: 480 }}>
-      <Brand />
-      <h1 style={{ marginTop: 24 }}>Log in</h1>
-      <Flash message={query.error} />
-      <form className="grid-form" action={loginAction}>
-        <Field label="Email" name="email" type="email" required autoComplete="email" />
-        <Field label="Password" name="password" type="password" required autoComplete="current-password" />
-        <button className="btn btn-primary" type="submit">
-          Log in
-        </button>
-      </form>
-      <p className="muted">
-        New here? <Link href="/signup">Open a studio</Link>
-      </p>
+    <main id="main" className="auth-shell">
+      <div className="auth-panel glass-strong">
+        <Brand />
+        <div className="stack-sm">
+          <h1 className="page-title">Log in</h1>
+          <p className="muted">For studio owners and instructors. Members don’t need to log in to book.</p>
+        </div>
+        <ActionForm action={loginAction} className="grid-form">
+          <Field label="Email" name="email" type="email" required autoComplete="email" />
+          <Field label="Password" name="password" type="password" required autoComplete="current-password" />
+          <SubmitButton className="btn btn-primary btn-lg" pendingLabel="Logging in…">
+            Log in
+          </SubmitButton>
+        </ActionForm>
+        <p className="muted">
+          New to Openweek? <Link href="/signup">Open a studio</Link>
+        </p>
+      </div>
     </main>
   );
 }

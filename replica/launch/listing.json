@@ -1,16 +1,16 @@
 {
   "avoid": ["Mindbody", "Punchpass", "Arketa", "Momence", "WellnessLiving", "Vagaro", "Glofox", "Acuity Scheduling", "ClassPass"],
   "app_store": {
-    "name": "StudioFlat",
+    "name": "Openweek",
     "subtitle": "Book class. Keep the fee.",
     "promotional_text": "Schedule, packs, and waitlists for one studio. Your Stripe account takes the card. We add $0.",
-    "description": "StudioFlat is class booking for a small studio.\n\nPublish the week. A member reserves a drop-in from the phone without creating an account. Packs and memberships expire on a date you set. A full class keeps a waitlist and offers the next person a limited time to claim.\n\nYou connect your own Stripe account. StudioFlat does not add a platform fee on the payment.\n\nMicro is $29 a month for a solo instructor. Studio is $49 a month. Annual billing includes two months free.\n\nThe member schedule can be installed from the browser. This version does not include a separate branded app store app.",
+    "description": "Openweek is class booking for a small studio.\n\nPublish the week. A member reserves a drop-in from the phone without creating an account. Packs and memberships expire on a date you set. A full class keeps a waitlist and offers the next person a limited time to claim.\n\nYou connect your own Stripe account. Openweek does not add a platform fee on the payment.\n\nMicro is $29 a month for a solo instructor. Studio is $49 a month. Annual billing includes two months free.\n\nThe member schedule can be installed from the browser. This version does not include a separate branded app store app.",
     "keywords": "pilates,yoga,waitlist,membership,schedule,roster,packs,reminders",
     "whats_new": "First release. Schedule, passes, waitlist, and a flat monthly price."
   },
   "google_play": {
-    "title": "StudioFlat",
+    "title": "Openweek",
     "short_description": "Class booking for a small studio. Your Stripe account, no platform fee.",
-    "full_description": "StudioFlat is class booking for a small studio.\n\nPublish the week. A member reserves a drop-in from the phone without creating an account. Packs and memberships expire on a date you set.\n\nYou connect your own Stripe account. StudioFlat does not add a platform fee.\n\nMicro is $29 a month. Studio is $49 a month."
+    "full_description": "Openweek is class booking for a small studio.\n\nPublish the week. A member reserves a drop-in from the phone without creating an account. Packs and memberships expire on a date you set.\n\nYou connect your own Stripe account. Openweek does not add a platform fee.\n\nMicro is $29 a month. Studio is $49 a month."
   }
 }

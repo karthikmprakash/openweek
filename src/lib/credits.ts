@@ -185,11 +185,13 @@ export function listMembers(db: Db, studioId: string, now: Date) {
   return db
     .prepare(
       `SELECT m.id, m.name, m.email, m.email_opt_out, m.phone,
-              (SELECT COUNT(*) FROM entitlements e
-                WHERE e.member_id = m.id AND e.expires_at > ?
-                  AND (e.unlimited = 1 OR e.credits_remaining > 0)) AS active_passes
+              COUNT(e.id) AS active_passes
        FROM members m
+       LEFT JOIN entitlements e
+         ON e.member_id = m.id AND e.expires_at > ?
+         AND (e.unlimited = 1 OR e.credits_remaining > 0)
        WHERE m.studio_id = ?
+       GROUP BY m.id
        ORDER BY m.name`,
     )
     .all(now.toISOString(), studioId) as Array<{

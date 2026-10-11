@@ -1,11 +1,11 @@
 {
-  "name": "StudioFlat",
-  "short_name": "StudioFlat",
+  "name": "Openweek",
+  "short_name": "Openweek",
   "description": "Class schedule for a small studio.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f6f3ec",
+  "background_color": "#d8e4df",
   "theme_color": "#0b3d3b",
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },

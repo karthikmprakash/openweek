@@ -22,8 +22,9 @@ build/
 .DS_Store
 *.log
 
-# Local databases and Playwright output
+# Local databases, backups, and Playwright output
 data/
+backups/
 test-results/
 playwright-report/
 blob-report/

@@ -3,8 +3,10 @@ import { getBooking } from "./booking";
 import { creditsRemaining, restoreCredit, spendCredit, usableEntitlements } from "./credits";
 import type { Db } from "./db";
 import { DomainError } from "./errors";
+import { formatMoney } from "./money";
 import { insertPayment } from "./payments";
-import { getSession, getStudio } from "./schedule";
+import { getSession, getStudio, type Studio } from "./schedule";
+import { formatInZone } from "./time";
 import { promoteNext } from "./waitlist";
 
 export type PolicyOutcome = {
@@ -160,6 +162,40 @@ function record(
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(crypto.randomUUID(), booking.studio_id, booking.id, kind, mode, feeCents, creditDelta, message, now.toISOString());
   return { kind, mode, feeCents, creditDelta, message, bookingId: booking.id };
+}
+
+type PolicyStudio = Pick<
+  Studio,
+  "cancellation_window_hours" | "late_cancel_mode" | "late_cancel_fee_cents" | "no_show_mode" | "no_show_fee_cents" | "timezone"
+>;
+
+export function consequence(mode: Studio["late_cancel_mode"], feeCents: number): string {
+  if (mode === "fee") return feeCents > 0 ? `a ${formatMoney(feeCents)} fee, and the visit goes back on the pass` : "no fee, and the visit goes back on the pass";
+  if (mode === "credit") return "one extra visit is taken from the pass";
+  return "the visit is used and no fee is charged";
+}
+
+/** What cancelling right now means for this member, in plain words. */
+export function cancellationTerms(studio: PolicyStudio, startsAt: string, now: Date): { free: boolean; text: string } {
+  const deadline = new Date(new Date(startsAt).getTime() - studio.cancellation_window_hours * 60 * 60 * 1000);
+  if (now < deadline) {
+    return { free: true, text: `Free cancellation until ${formatInZone(deadline.toISOString(), studio.timezone)}.` };
+  }
+  return {
+    free: false,
+    text: `The free cancellation window has closed. Cancelling now counts as late: ${consequence(studio.late_cancel_mode, studio.late_cancel_fee_cents)}.`,
+  };
+}
+
+export function policySummary(studio: PolicyStudio): string[] {
+  const hours = studio.cancellation_window_hours;
+  return [
+    hours === 0
+      ? "Members can cancel for free right up to the start of class."
+      : `Members can cancel for free up to ${hours} hour${hours === 1 ? "" : "s"} before class.`,
+    `A later cancel means ${consequence(studio.late_cancel_mode, studio.late_cancel_fee_cents)}.`,
+    `Not showing up means ${consequence(studio.no_show_mode, studio.no_show_fee_cents)}.`,
+  ];
 }
 
 export function latestOutcome(db: Db, bookingId: string): PolicyOutcome | null {

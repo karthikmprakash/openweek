@@ -27,10 +27,14 @@ export function holdingCount(db: Db, sessionId: string): number {
   return row.c;
 }
 
+export function remainingSpots(capacity: number, held: number): number {
+  return Math.max(0, capacity - held);
+}
+
 export function spotsLeft(db: Db, sessionId: string): number {
   const session = getSession(db, sessionId);
   if (!session) return 0;
-  return Math.max(0, session.capacity - holdingCount(db, sessionId));
+  return remainingSpots(session.capacity, holdingCount(db, sessionId));
 }
 
 export type BookResult = {
@@ -60,7 +64,8 @@ export function bookGuest(
     }
     if (session.status !== "scheduled") throw new DomainError("This class was cancelled.", "cancelled");
     if (session.starts_at <= now.toISOString()) throw new DomainError("This class has already started.", "past");
-    if (holdingCount(db, session.id) >= session.capacity) {
+    const held = holdingCount(db, session.id);
+    if (held >= session.capacity) {
       throw new DomainError("This class is full. Join the waitlist.", "full");
     }
 
@@ -85,7 +90,7 @@ export function bookGuest(
       entitlementId,
       now,
     });
-    return { booking, spotsLeft: spotsLeft(db, session.id), usedEntitlementId: entitlementId };
+    return { booking, spotsLeft: remainingSpots(session.capacity, held + 1), usedEntitlementId: entitlementId };
   })();
 }
 
@@ -120,7 +125,13 @@ export async function bookWithCard(
     .get(input.idempotencyKey) as { id: string; booking_id: string | null } | undefined;
   if (existing?.booking_id) {
     const booking = getBooking(db, existing.booking_id);
-    if (booking) return { booking, spotsLeft: spotsLeft(db, booking.session_id), usedEntitlementId: booking.entitlement_id };
+    if (booking) {
+      return {
+        booking,
+        spotsLeft: remainingSpots(session.capacity, holdingCount(db, booking.session_id)),
+        usedEntitlementId: booking.entitlement_id,
+      };
+    }
   }
 
   const charge = await createDirectCharge(stripe, {
@@ -165,7 +176,7 @@ export async function bookWithCard(
         },
         now,
       );
-      return { booking, spotsLeft: spotsLeft(db, session.id), usedEntitlementId: null };
+      return { booking, spotsLeft: remainingSpots(session.capacity, holdingCount(db, session.id)), usedEntitlementId: null };
     })();
   } catch (error) {
     await stripe.refunds.create({ payment_intent: charge.id });
@@ -224,6 +235,14 @@ export function getBookingByToken(db: Db, token: string): BookingRow | null {
   return (db.prepare(`SELECT * FROM bookings WHERE manage_token = ?`).get(token) as BookingRow | undefined) ?? null;
 }
 
+export function getActiveBookingForEmail(db: Db, sessionId: string, email: string): BookingRow | null {
+  return (
+    (db
+      .prepare(`SELECT * FROM bookings WHERE session_id = ? AND guest_email = ? AND status IN ${HOLDING}`)
+      .get(sessionId, normalEmail(email)) as BookingRow | undefined) ?? null
+  );
+}
+
 export function listBookingsForSession(db: Db, studioId: string, sessionId: string): BookingRow[] {
   return db
     .prepare(
@@ -243,6 +262,28 @@ export function listUpcomingBookings(db: Db, studioId: string, now: Date) {
        ORDER BY s.starts_at ASC, b.guest_name ASC`,
     )
     .all(studioId, new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString()) as Array<{
+    id: string;
+    guest_name: string;
+    guest_email: string;
+    status: string;
+    manage_token: string;
+    starts_at: string;
+    class_name: string;
+    session_id: string;
+  }>;
+}
+
+export function listUpcomingBookingsForEmail(db: Db, studioId: string, email: string, now: Date) {
+  return db
+    .prepare(
+      `SELECT b.id, b.guest_name, b.guest_email, b.status, b.manage_token, s.starts_at, c.name AS class_name, s.id AS session_id
+       FROM bookings b
+       JOIN class_sessions s ON s.id = b.session_id
+       JOIN class_types c ON c.id = s.class_type_id
+       WHERE b.studio_id = ? AND b.guest_email = ? AND s.starts_at >= ? AND b.status IN ('confirmed', 'offer_pending', 'attended')
+       ORDER BY s.starts_at ASC`,
+    )
+    .all(studioId, normalEmail(email), new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString()) as Array<{
     id: string;
     guest_name: string;
     guest_email: string;

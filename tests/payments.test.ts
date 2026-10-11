@@ -67,13 +67,13 @@ describe("bring-your-own Stripe", () => {
     const now = new Date("2026-06-01T15:00:00.000Z");
     const studio = studioFixture(handle.db, now);
     const { sessionId } = classOn(handle.db, studio.studioId, new Date("2026-06-04T16:00:00.000Z"), { priceCents: 4000, capacity: 2 }, now);
-    handle.db.prepare(`UPDATE studios SET stripe_account_id = ? WHERE id = ?`).run("acct_studioflat", studio.studioId);
+    handle.db.prepare(`UPDATE studios SET stripe_account_id = ? WHERE id = ?`).run("acct_openweek", studio.studioId);
 
     const params = paymentIntentCreateParams({
       amountCents: 4000,
       currency: "usd",
       metadata: { studio_id: studio.studioId },
-      stripeAccountId: "acct_studioflat",
+      stripeAccountId: "acct_openweek",
       idempotencyKey: "idem-1",
     });
     expect(params).not.toHaveProperty("application_fee_amount");
@@ -88,14 +88,14 @@ describe("bring-your-own Stripe", () => {
         guestName: "Avery Lane",
         guestEmail: "avery@example.test",
         idempotencyKey: "idem-1",
-        stripeAccountId: "acct_studioflat",
+        stripeAccountId: "acct_openweek",
       },
       now,
     );
     expect(booked.booking.status).toBe("confirmed");
     expect(booked.spotsLeft).toBe(1);
     expect(gateway.bodies[0]).not.toContain("application_fee");
-    expect(gateway.headers[0]).toBe("acct_studioflat");
+    expect(gateway.headers[0]).toBe("acct_openweek");
 
     const payment = handle.db.prepare(`SELECT * FROM payments WHERE booking_id = ?`).get(booked.booking.id) as {
       amount_cents: number;

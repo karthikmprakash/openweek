@@ -1,4 +1,4 @@
-# AGENT BUILD PROMPT — StudioFlat
+# AGENT BUILD PROMPT — Openweek
 
 > **How to use:** paste this whole file as the *first* message to the Cursor agent in **Agent mode** (not Ask/Chat), with the project folder open. Then leave it alone. If it ever stops, paste the same file again — §9 tells it to resume, never restart.
 
@@ -13,7 +13,7 @@
 
 ## 1. Mission
 
-Build **StudioFlat** — flat-fee class booking for micro studios — schedule, memberships, waitlists, policy automation, and bring-your-own Stripe with zero platform percentage — to a standard a real owner-operator of a boutique studio under 150 members (Pilates reformer, yoga, barre, small box, martial arts) would pay for and use daily.
+Build **Openweek** — flat-fee class booking for micro studios — schedule, memberships, waitlists, policy automation, and bring-your-own Stripe with zero platform percentage — to a standard a real owner-operator of a boutique studio under 150 members (Pilates reformer, yoga, barre, small box, martial arts) would pay for and use daily.
 
 The deliverable is a **running, tested, verifiable product**. Not a prototype, not mock screens, not a plan, not a description of what you would build. If a feature is in `replica/features.json`, it exists in code and its verify command exits 0.
 

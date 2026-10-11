@@ -18,6 +18,8 @@ export async function openStudio(page: Page) {
   await page.getByLabel("Email").fill(`owner-${stamp}@example.test`);
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Create studio" }).click();
+  await expect(page.getByRole("heading", { name: "Today" })).toBeVisible();
+  await page.locator('a[href="/studio/schedule?new=1"]').click();
   await expect(page.getByRole("heading", { name: "Schedule" })).toBeVisible();
   return { slug, password };
 }

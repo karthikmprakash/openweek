@@ -23,7 +23,7 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       ...process.env,
-      STUDIOFLAT_DB: dbFile,
+      OPENWEEK_DB: dbFile,
       COOKIE_SECURE: "",
     },
   },

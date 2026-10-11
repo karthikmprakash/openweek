@@ -16,7 +16,7 @@ Sources: 150 App Store reviews in `replica/reviews.csv` (consumer app id 6895013
 
 ## What is still unsolved
 
-The consumer marketplace is why some people stay, and it is also why others feel forced into a bad app. StudioFlat does not build that marketplace. A studio that needs discovery from a giant app will not switch for a fee story alone.
+The consumer marketplace is why some people stay, and it is also why others feel forced into a bad app. Openweek does not build that marketplace. A studio that needs discovery from a giant app will not switch for a fee story alone.
 
 ## What we changed
 

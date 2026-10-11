@@ -1,45 +1,28 @@
 "use server";
 
+import { refresh } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { checkIn } from "@/lib/attendance";
-import {
-  consumeRateLimit,
-  createStudioAccount,
-  deleteStudio,
-  login,
-} from "@/lib/auth";
-import { bookGuest, bookWithCard, getBookingByToken } from "@/lib/booking";
-import {
-  createProduct,
-  grantEntitlement,
-  setEmailOptOut,
-  upsertMember,
-  type ProductKind,
-} from "@/lib/credits";
+import { consumeRateLimit, createStudioAccount, deleteStudio, login } from "@/lib/auth";
+import { bookGuest, bookWithCard, getActiveBookingForEmail, getBookingByToken, listUpcomingBookingsForEmail } from "@/lib/booking";
+import { createProduct, grantEntitlement, setEmailOptOut, upsertMember, type ProductKind } from "@/lib/credits";
 import { getDb } from "@/lib/db";
-import { isDomainError } from "@/lib/errors";
-import { importMembers, type ImportField } from "@/lib/importer";
+import { DomainError } from "@/lib/errors";
+import { failure, type FormState } from "@/lib/form-state";
+import { importMembers, type ImportField, type ImportResult } from "@/lib/importer";
 import { dollarsToCents } from "@/lib/money";
 import { getStripeFromEnv } from "@/lib/payments";
 import { cancelBooking } from "@/lib/policy";
 import { emailExpiring } from "@/lib/reports";
-import { addSession, createClassType, setStripeAccount, updatePolicies } from "@/lib/schedule";
-import { zonedLocalToUtc } from "@/lib/time";
-import { claimOffer, joinWaitlist } from "@/lib/waitlist";
+import { addWeeklySessions, createClassType, getStudioBySlug, setStripeAccount, updatePolicies } from "@/lib/schedule";
+import { cancelSession } from "@/lib/sessions";
+import { claimOffer, joinWaitlist, listActiveWaitlistForEmail } from "@/lib/waitlist";
+import { clearGuestEmail, writeGuestEmail } from "@/server/guest";
 import { clearSession, currentStaff, writeSession } from "@/server/session";
 
-const email = z.string().trim().regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Add a real email.");
-
-function fail(path: string, error: unknown): never {
-  const message = isDomainError(error)
-    ? error.message
-    : error instanceof Error
-      ? error.message
-      : "Something went wrong.";
-  redirect(`${path}?error=${encodeURIComponent(message)}`);
-}
+const email = z.string().trim().regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Add a real email address.");
 
 async function clientKey(label: string): Promise<string> {
   const head = await headers();
@@ -47,25 +30,46 @@ async function clientKey(label: string): Promise<string> {
   return `${label}:${ip}`;
 }
 
-export async function signupAction(formData: FormData) {
+async function requireStaff() {
+  const staff = await currentStaff();
+  if (!staff) redirect("/login");
+  return staff;
+}
+
+function text(formData: FormData, key: string, fallback = ""): string {
+  const value = formData.get(key);
+  return typeof value === "string" ? value : fallback;
+}
+
+function whole(formData: FormData, key: string, label: string): number {
+  const raw = text(formData, key).trim();
+  if (!/^\d+$/.test(raw)) throw new DomainError(`${label} needs a whole number.`, key);
+  return Number(raw);
+}
+
+function bookingPath(token: string) {
+  return `/b/${encodeURIComponent(token)}`;
+}
+
+export async function signupAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const parsed = z
     .object({
-      studioName: z.string().trim().min(2).max(80),
-      slug: z.string().trim().min(3).max(40),
-      ownerName: z.string().trim().min(2).max(80),
+      studioName: z.string().trim().min(2, "Add the studio name.").max(80, "Keep the studio name under 80 characters."),
+      slug: z.string().trim().min(3, "The web address needs at least 3 characters.").max(40, "Keep the web address under 40 characters."),
+      ownerName: z.string().trim().min(2, "Add your name.").max(80, "Keep your name under 80 characters."),
       email,
-      password: z.string().min(8).max(200),
-      timezone: z.string().trim().min(1),
+      password: z.string().min(8, "Use at least 8 characters for the password.").max(200),
+      timezone: z.string().trim().min(1, "Pick a time zone."),
     })
     .safeParse({
-      studioName: formData.get("studioName"),
-      slug: formData.get("slug"),
-      ownerName: formData.get("ownerName"),
-      email: formData.get("email"),
-      password: formData.get("password"),
-      timezone: formData.get("timezone") || "America/Los_Angeles",
+      studioName: text(formData, "studioName"),
+      slug: text(formData, "slug"),
+      ownerName: text(formData, "ownerName"),
+      email: text(formData, "email"),
+      password: text(formData, "password"),
+      timezone: text(formData, "timezone") || "America/Los_Angeles",
     });
-  if (!parsed.success) fail("/signup", new Error(parsed.error.issues[0]?.message ?? "Check the form."));
+  if (!parsed.success) return failure(new Error(parsed.error.issues[0]?.message ?? "Check the form."), formData);
   const db = getDb();
   const now = new Date();
   try {
@@ -73,16 +77,16 @@ export async function signupAction(formData: FormData) {
     const created = createStudioAccount(db, parsed.data, now);
     await writeSession(created.token);
   } catch (error) {
-    fail("/signup", error);
+    return failure(error, formData);
   }
-  redirect("/studio/schedule");
+  redirect("/studio");
 }
 
-export async function loginAction(formData: FormData) {
+export async function loginAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const parsed = z
     .object({ email, password: z.string().min(1) })
-    .safeParse({ email: formData.get("email"), password: formData.get("password") });
-  if (!parsed.success) fail("/login", new Error("Enter your email and password."));
+    .safeParse({ email: text(formData, "email"), password: text(formData, "password") });
+  if (!parsed.success) return failure(new Error("Enter your email and password."), formData);
   const db = getDb();
   const now = new Date();
   try {
@@ -90,7 +94,7 @@ export async function loginAction(formData: FormData) {
     const session = login(db, parsed.data.email, parsed.data.password, now);
     await writeSession(session.token);
   } catch (error) {
-    fail("/login", error);
+    return failure(error, formData);
   }
   redirect("/studio");
 }
@@ -100,340 +104,381 @@ export async function logoutAction() {
   redirect("/");
 }
 
-export async function publishClassAction(formData: FormData) {
-  const staff = await currentStaff();
-  if (!staff) redirect("/login");
+export async function publishClassAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const staff = await requireStaff();
   const db = getDb();
   const now = new Date();
+  const name = text(formData, "name").trim();
+  let created = 0;
   try {
-    const price = dollarsToCents(String(formData.get("price") ?? ""));
-    const classTypeId = createClassType(
-      db,
-      {
-        studioId: staff.studioId,
-        name: String(formData.get("name") ?? ""),
-        durationMin: Number(formData.get("minutes") ?? 50),
-        capacity: Number(formData.get("spots") ?? 8),
-        dropInPriceCents: price,
-        description: String(formData.get("description") ?? ""),
-      },
-      now,
-    );
-    const starts = zonedLocalToUtc(String(formData.get("startsAt") ?? ""), staff.timezone);
-    addSession(
-      db,
-      {
-        studioId: staff.studioId,
-        classTypeId,
-        startsAt: starts,
-        instructorName: String(formData.get("instructor") ?? staff.name),
-      },
-      now,
-    );
+    const price = dollarsToCents(text(formData, "price"));
+    const minutes = whole(formData, "minutes", "Class length");
+    const spots = whole(formData, "spots", "Spots");
+    const weeks = whole(formData, "repeatWeeks", "Weeks");
+    db.transaction(() => {
+      const classTypeId = createClassType(
+        db,
+        { studioId: staff.studioId, name, durationMin: minutes, capacity: spots, dropInPriceCents: price, description: text(formData, "description") },
+        now,
+      );
+      created = addWeeklySessions(
+        db,
+        {
+          studioId: staff.studioId,
+          classTypeId,
+          firstLocal: text(formData, "startsAt"),
+          timeZone: staff.timezone,
+          weeks,
+          instructorName: text(formData, "instructor", staff.name),
+        },
+        now,
+      ).length;
+    })();
   } catch (error) {
-    fail("/studio/schedule", error);
+    return failure(error, formData);
   }
-  redirect("/studio/schedule");
+  const week = text(formData, "startsAt").slice(0, 10);
+  const notice = created === 1 ? `Published ${name}.` : `Published ${name} for ${created} weeks.`;
+  redirect(`/studio/schedule?week=${week}&notice=${encodeURIComponent(notice)}`);
 }
 
-export async function addSessionAction(formData: FormData) {
-  const staff = await currentStaff();
-  if (!staff) redirect("/login");
+export async function addSessionAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const staff = await requireStaff();
   const db = getDb();
-  const now = new Date();
+  let created = 0;
   try {
-    addSession(
+    created = addWeeklySessions(
       db,
       {
         studioId: staff.studioId,
-        classTypeId: String(formData.get("classTypeId") ?? ""),
-        startsAt: zonedLocalToUtc(String(formData.get("startsAt") ?? ""), staff.timezone),
-        instructorName: String(formData.get("instructor") ?? ""),
+        classTypeId: text(formData, "classTypeId"),
+        firstLocal: text(formData, "startsAt"),
+        timeZone: staff.timezone,
+        weeks: whole(formData, "repeatWeeks", "Weeks"),
+        instructorName: text(formData, "instructor"),
       },
-      now,
-    );
+      new Date(),
+    ).length;
   } catch (error) {
-    fail("/studio/schedule", error);
+    return failure(error, formData);
   }
-  redirect("/studio/schedule");
+  const week = text(formData, "startsAt").slice(0, 10);
+  const notice = created === 1 ? "Session added." : `Added ${created} weekly sessions.`;
+  redirect(`/studio/schedule?week=${week}&notice=${encodeURIComponent(notice)}`);
 }
 
-export async function reserveAction(formData: FormData) {
-  const studioId = String(formData.get("studioId") ?? "");
-  const sessionId = String(formData.get("sessionId") ?? "");
-  const slug = String(formData.get("slug") ?? "");
-  const back = `/s/${slug}/book/${sessionId}`;
+export async function cancelSessionAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const staff = await requireStaff();
+  const sessionId = text(formData, "sessionId");
+  let summary = "";
+  try {
+    const result = cancelSession(getDb(), staff.studioId, sessionId, new Date());
+    const parts = [`Class cancelled. ${result.cancelled} ${result.cancelled === 1 ? "member was" : "members were"} told.`];
+    if (result.restored > 0) parts.push(`${result.restored} visit${result.restored === 1 ? "" : "s"} returned to passes.`);
+    if (result.paidByCard > 0) parts.push(`Refund ${result.paidByCard} card payment${result.paidByCard === 1 ? "" : "s"} in Stripe.`);
+    summary = parts.join(" ");
+  } catch (error) {
+    return failure(error, formData);
+  }
+  redirect(`/studio/schedule?notice=${encodeURIComponent(summary)}`);
+}
+
+export async function bookAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const studioId = text(formData, "studioId");
+  const sessionId = text(formData, "sessionId");
+  const guestName = text(formData, "guestName");
+  const guestEmail = text(formData, "email");
   const db = getDb();
   const now = new Date();
   let token = "";
+  const card = text(formData, "intent") === "card";
+  const already = getActiveBookingForEmail(db, sessionId, guestEmail);
+  if (already) {
+    await writeGuestEmail(already.guest_email);
+    redirect(bookingPath(already.manage_token));
+  }
   try {
     await consumeRateLimit(db, await clientKey("book"), 30, 10 * 60 * 1000, now);
-    const booked = bookGuest(
-      db,
-      {
-        studioId,
-        sessionId,
-        guestName: String(formData.get("guestName") ?? ""),
-        guestEmail: String(formData.get("email") ?? ""),
-      },
-      now,
-    );
-    token = booked.booking.manage_token;
+    if (card) {
+      const stripe = getStripeFromEnv();
+      if (!stripe) throw new DomainError("This studio isn't taking card payments yet. Use a pass, or ask the studio.", "stripe");
+      const studio = db.prepare(`SELECT stripe_account_id FROM studios WHERE id = ?`).get(studioId) as
+        | { stripe_account_id: string | null }
+        | undefined;
+      const booked = await bookWithCard(
+        db,
+        stripe,
+        {
+          studioId,
+          sessionId,
+          guestName,
+          guestEmail,
+          idempotencyKey: text(formData, "idempotencyKey") || crypto.randomUUID(),
+          stripeAccountId: studio?.stripe_account_id ?? null,
+        },
+        now,
+      );
+      token = booked.booking.manage_token;
+    } else {
+      token = bookGuest(db, { studioId, sessionId, guestName, guestEmail }, now).booking.manage_token;
+    }
   } catch (error) {
-    fail(back, error);
+    if (error instanceof DomainError && error.code === "duplicate") {
+      const existing = getActiveBookingForEmail(db, sessionId, guestEmail);
+      if (existing) {
+        await writeGuestEmail(existing.guest_email);
+        redirect(bookingPath(existing.manage_token));
+      }
+    }
+    if (card) refresh();
+    return failure(error, formData);
   }
-  redirect(`/b/${token}`);
+  await writeGuestEmail(guestEmail);
+  redirect(bookingPath(token));
 }
 
-export async function payAndReserveAction(formData: FormData) {
-  const studioId = String(formData.get("studioId") ?? "");
-  const sessionId = String(formData.get("sessionId") ?? "");
-  const slug = String(formData.get("slug") ?? "");
-  const back = `/s/${slug}/book/${sessionId}`;
-  const stripe = getStripeFromEnv();
-  if (!stripe) fail(back, new Error("Connect Stripe in studio settings before taking a card."));
-  const db = getDb();
-  const now = new Date();
-  let token = "";
-  try {
-    const studio = db.prepare(`SELECT stripe_account_id FROM studios WHERE id = ?`).get(studioId) as
-      | { stripe_account_id: string | null }
-      | undefined;
-    const booked = await bookWithCard(
-      db,
-      stripe,
-      {
-        studioId,
-        sessionId,
-        guestName: String(formData.get("guestName") ?? ""),
-        guestEmail: String(formData.get("email") ?? ""),
-        idempotencyKey: String(formData.get("idempotencyKey") ?? crypto.randomUUID()),
-        stripeAccountId: studio?.stripe_account_id ?? null,
-      },
-      now,
-    );
-    token = booked.booking.manage_token;
-  } catch (error) {
-    fail(back, error);
-  }
-  redirect(`/b/${token}`);
-}
-
-export async function waitlistAction(formData: FormData) {
-  const sessionId = String(formData.get("sessionId") ?? "");
-  const slug = String(formData.get("slug") ?? "");
-  const back = `/s/${slug}/book/${sessionId}`;
-  const db = getDb();
+export async function waitlistAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const slug = text(formData, "slug");
   let position = 0;
   try {
     const row = joinWaitlist(
-      db,
+      getDb(),
       {
-        studioId: String(formData.get("studioId") ?? ""),
-        sessionId,
-        guestName: String(formData.get("guestName") ?? ""),
-        guestEmail: String(formData.get("email") ?? ""),
+        studioId: text(formData, "studioId"),
+        sessionId: text(formData, "sessionId"),
+        guestName: text(formData, "guestName"),
+        guestEmail: text(formData, "email"),
       },
       new Date(),
     );
     position = row.position;
+    await writeGuestEmail(text(formData, "email"));
   } catch (error) {
-    fail(back, error);
+    return failure(error, formData);
   }
-  redirect(`/s/${slug}?wait=${position}`);
+  redirect(`/s/${encodeURIComponent(slug)}?wait=${position}`);
 }
 
-export async function cancelBookingAction(formData: FormData) {
-  const token = String(formData.get("token") ?? "");
+export async function findBookingAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const slug = text(formData, "slug");
+  const parsed = email.safeParse(text(formData, "email"));
+  if (!parsed.success) return failure(new Error("Add the email you booked with."), formData);
   const db = getDb();
+  const now = new Date();
   try {
-    cancelBooking(db, { token }, new Date());
+    await consumeRateLimit(db, await clientKey(`find:${parsed.data}`), 8, 15 * 60 * 1000, now);
+    const studio = getStudioBySlug(db, slug);
+    if (!studio) throw new DomainError("That studio is not on Openweek.", "not_found");
+    const upcoming = listUpcomingBookingsForEmail(db, studio.id, parsed.data, now);
+    const waiting = listActiveWaitlistForEmail(db, studio.id, parsed.data);
+    if (upcoming.length === 0 && waiting.length === 0) {
+      throw new DomainError("No upcoming classes or waitlist spots for that email. Check the address, or reserve from the week above.", "not_found");
+    }
+    await writeGuestEmail(parsed.data);
   } catch (error) {
-    fail(`/b/${token}`, error);
+    return failure(error, formData);
   }
-  redirect(`/b/${token}`);
+  redirect(`/s/${encodeURIComponent(slug)}`);
 }
 
-export async function claimOfferAction(formData: FormData) {
-  const token = String(formData.get("token") ?? "");
-  const db = getDb();
-  try {
-    claimOffer(db, token, new Date());
-  } catch (error) {
-    fail(`/b/${token}`, error);
-  }
-  redirect(`/b/${token}`);
+export async function forgetGuestAction() {
+  await clearGuestEmail();
+  refresh();
 }
 
-export async function selfCheckInAction(formData: FormData) {
-  const token = String(formData.get("token") ?? "");
-  const db = getDb();
-  const booking = getBookingByToken(db, token);
-  if (!booking) fail("/", new Error("That confirmation link is not valid."));
+export async function rememberGuestFromToken(token: string) {
+  if (await currentStaff()) return;
+  const booking = getBookingByToken(getDb(), token);
+  if (!booking) return;
+  if (!["confirmed", "offer_pending", "attended"].includes(booking.status)) return;
+  await writeGuestEmail(booking.guest_email);
+}
+
+export async function cancelBookingAction(_prev: FormState, formData: FormData): Promise<FormState> {
   try {
+    cancelBooking(getDb(), { token: text(formData, "token") }, new Date());
+  } catch (error) {
+    return failure(error);
+  }
+  refresh();
+  return null;
+}
+
+export async function claimOfferAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  try {
+    const booking = claimOffer(getDb(), text(formData, "token"), new Date());
+    await writeGuestEmail(booking.guest_email);
+  } catch (error) {
+    return failure(error);
+  }
+  refresh();
+  return null;
+}
+
+export async function selfCheckInAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const token = text(formData, "token");
+  const db = getDb();
+  try {
+    const booking = getBookingByToken(db, token);
+    if (!booking) throw new DomainError("That confirmation link is not valid.", "not_found");
     checkIn(db, { bookingId: booking.id, studioId: booking.studio_id, method: "self", token }, new Date());
   } catch (error) {
-    fail(`/b/${token}`, error);
+    return failure(error);
   }
-  redirect(`/b/${token}`);
+  refresh();
+  return null;
 }
 
-export async function staffCheckInAction(formData: FormData) {
-  const staff = await currentStaff();
-  if (!staff) redirect("/login");
+export async function optOutAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const db = getDb();
+  const optOut = text(formData, "optOut") === "1";
   try {
-    checkIn(
-      db,
-      { bookingId: String(formData.get("bookingId") ?? ""), studioId: staff.studioId, method: "staff" },
-      new Date(),
-    );
+    const booking = getBookingByToken(db, text(formData, "token"));
+    if (!booking) throw new DomainError("That confirmation link is not valid.", "not_found");
+    setEmailOptOut(db, booking.studio_id, booking.guest_email, optOut);
   } catch (error) {
-    fail("/studio/check-in", error);
+    return failure(error);
   }
-  redirect("/studio/check-in");
+  refresh();
+  return { notice: optOut ? "Reminder emails are off." : "Reminder emails are back on." };
 }
 
-export async function savePoliciesAction(formData: FormData) {
-  const staff = await currentStaff();
-  if (!staff) redirect("/login");
-  const db = getDb();
-  const mode = (value: FormDataEntryValue | null) => {
-    const raw = String(value ?? "forfeit");
-    if (raw === "fee" || raw === "credit" || raw === "forfeit") return raw;
-    return "forfeit" as const;
-  };
+export async function staffCheckInAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const staff = await requireStaff();
+  try {
+    checkIn(getDb(), { bookingId: text(formData, "bookingId"), studioId: staff.studioId, method: "staff" }, new Date());
+  } catch (error) {
+    return failure(error);
+  }
+  refresh();
+  return null;
+}
+
+export async function savePoliciesAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const staff = await requireStaff();
+  const mode = (value: string) => (value === "fee" || value === "credit" ? value : "forfeit");
   try {
     updatePolicies(
-      db,
+      getDb(),
       staff.studioId,
       {
-        cancellationWindowHours: Number(formData.get("windowHours") ?? 12),
-        lateCancelMode: mode(formData.get("lateMode")),
-        lateCancelFeeCents: dollarsToCents(String(formData.get("lateFee") ?? "0")),
-        noShowMode: mode(formData.get("noShowMode")),
-        noShowFeeCents: dollarsToCents(String(formData.get("noShowFee") ?? "0")),
-        waitlistClaimMinutes: Number(formData.get("claimMinutes") ?? 60),
-        reminderLeadHours: Number(formData.get("leadHours") ?? 24),
-        timezone: String(formData.get("timezone") ?? staff.timezone),
+        cancellationWindowHours: whole(formData, "windowHours", "The cancellation window"),
+        lateCancelMode: mode(text(formData, "lateMode")),
+        lateCancelFeeCents: dollarsToCents(text(formData, "lateFee", "0")),
+        noShowMode: mode(text(formData, "noShowMode")),
+        noShowFeeCents: dollarsToCents(text(formData, "noShowFee", "0")),
+        waitlistClaimMinutes: whole(formData, "claimMinutes", "The claim window"),
+        reminderLeadHours: whole(formData, "leadHours", "Reminder timing"),
+        timezone: text(formData, "timezone", staff.timezone),
       },
       new Date(),
     );
   } catch (error) {
-    fail("/studio/policies", error);
+    return failure(error, formData);
   }
   redirect("/studio/policies?saved=1");
 }
 
-export async function saveStripeAction(formData: FormData) {
-  const staff = await currentStaff();
-  if (!staff) redirect("/login");
-  const raw = String(formData.get("stripeAccount") ?? "").trim();
+export async function saveStripeAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const staff = await requireStaff();
+  const raw = text(formData, "stripeAccount").trim();
   try {
     setStripeAccount(getDb(), staff.studioId, raw || null, new Date());
   } catch (error) {
-    fail("/studio/settings", error);
+    return failure(error, formData);
   }
   redirect("/studio/settings?saved=1");
 }
 
-export async function deleteStudioAction() {
-  const staff = await currentStaff();
-  if (!staff || staff.role !== "owner") redirect("/studio/settings?error=Only%20the%20owner%20can%20close%20the%20studio.");
+export async function deleteStudioAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const staff = await requireStaff();
+  if (staff.role !== "owner") return { error: "Only the owner can close the studio." };
+  if (text(formData, "confirm").trim().toLowerCase() !== staff.slug) {
+    return { error: `Type ${staff.slug} to confirm.` };
+  }
   deleteStudio(getDb(), staff.studioId);
   await clearSession();
   redirect("/");
 }
 
-export async function createPassAction(formData: FormData) {
-  const staff = await currentStaff();
-  if (!staff) redirect("/login");
-  const kind = String(formData.get("kind") ?? "") as ProductKind;
-  if (kind !== "drop_in" && kind !== "pack" && kind !== "membership") {
-    fail("/studio/offerings", new Error("Choose a drop-in, a pack, or a membership."));
-  }
+export async function createPassAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const staff = await requireStaff();
+  const kind = text(formData, "kind") as ProductKind;
+  const name = text(formData, "name").trim();
   try {
+    if (kind !== "drop_in" && kind !== "pack" && kind !== "membership") {
+      throw new DomainError("Choose a drop-in, a pack, or a membership.", "kind");
+    }
     createProduct(
       getDb(),
       {
         studioId: staff.studioId,
         kind,
-        name: String(formData.get("name") ?? ""),
-        priceCents: dollarsToCents(String(formData.get("price") ?? "0")),
-        creditCount: kind === "pack" ? Number(formData.get("credits") ?? 0) : null,
-        validityDays: Number(formData.get("days") ?? 30),
+        name,
+        priceCents: dollarsToCents(text(formData, "price", "0")),
+        creditCount: kind === "pack" ? whole(formData, "credits", "Visits in a pack") : null,
+        validityDays: whole(formData, "days", "Valid for"),
       },
       new Date(),
     );
   } catch (error) {
-    fail("/studio/offerings", error);
+    return failure(error, formData);
   }
-  redirect("/studio/offerings");
+  refresh();
+  return { notice: `${name} is ready to give to members.` };
 }
 
-export async function grantPassAction(formData: FormData) {
-  const staff = await currentStaff();
-  if (!staff) redirect("/login");
+export async function grantPassAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const staff = await requireStaff();
   const db = getDb();
   const now = new Date();
+  let memberId = "";
   try {
-    const memberId = upsertMember(
-      db,
-      staff.studioId,
-      String(formData.get("guestName") ?? ""),
-      String(formData.get("email") ?? ""),
-      now,
-    );
-    grantEntitlement(db, { studioId: staff.studioId, memberId, productId: String(formData.get("productId") ?? "") }, now);
+    const address = email.safeParse(text(formData, "email"));
+    if (!address.success) throw new DomainError("Add a real email address.", "email");
+    const guestName = text(formData, "guestName").trim();
+    if (guestName.length < 2) throw new DomainError("Add the member's name.", "name");
+    db.transaction(() => {
+      memberId = upsertMember(db, staff.studioId, guestName, address.data, now);
+      grantEntitlement(db, { studioId: staff.studioId, memberId, productId: text(formData, "productId") }, now);
+    })();
   } catch (error) {
-    fail("/studio/offerings", error);
+    return failure(error, formData);
   }
-  redirect("/studio/members");
+  redirect(`/studio/members/${memberId}?notice=${encodeURIComponent("Pass given.")}`);
 }
 
-export async function optOutAction(formData: FormData) {
-  const token = String(formData.get("token") ?? "");
-  const db = getDb();
-  const booking = getBookingByToken(db, token);
-  if (!booking) fail("/", new Error("That confirmation link is not valid."));
-  setEmailOptOut(db, booking.studio_id, booking.guest_email, formData.get("optOut") === "1");
-  redirect(`/b/${token}`);
-}
+export type ImportState = (FormState & { result?: ImportResult }) | null;
 
-export async function importAction(formData: FormData) {
-  const staff = await currentStaff();
-  if (!staff) redirect("/login");
-  let text = String(formData.get("csv") ?? "");
-  const file = formData.get("file");
-  if (file instanceof File && file.size > 0) {
-    if (file.size > 1_000_000) fail("/studio/import", new Error("Keep the file under 1 MB."));
-    text = await file.text();
+export async function importAction(_prev: ImportState, formData: FormData): Promise<ImportState> {
+  const staff = await requireStaff();
+  const csv = text(formData, "csv");
+  if (csv.length > 1_000_000) return { error: "Keep the file under 1 MB." };
+  if (!csv.trim()) return { error: "Choose a CSV file or paste rows first." };
+  const mapping = {} as Partial<Record<ImportField, string>>;
+  for (const field of ["name", "email", "phone", "product_kind", "product_name", "credits_remaining", "expires_at"] as const) {
+    mapping[field] = text(formData, `map_${field}`, field);
   }
-  const mapping: Partial<Record<ImportField, string>> = {
-    name: String(formData.get("map_name") ?? "name"),
-    email: String(formData.get("map_email") ?? "email"),
-    phone: String(formData.get("map_phone") ?? "phone"),
-    product_kind: String(formData.get("map_product_kind") ?? "product_kind"),
-    product_name: String(formData.get("map_product_name") ?? "product_name"),
-    credits_remaining: String(formData.get("map_credits_remaining") ?? "credits_remaining"),
-    expires_at: String(formData.get("map_expires_at") ?? "expires_at"),
-  };
-  let next = "/studio/import";
+  const dryRun = text(formData, "intent") !== "import";
   try {
-    const result = importMembers(getDb(), staff.studioId, text, mapping, { dryRun: formData.get("dryRun") === "1" }, new Date());
-    const summary = result.dryRun
-      ? `Preview only. ${result.preview.length} rows ready, ${result.badRows.length} rows need a fix.`
-      : `Imported ${result.imported}. ${result.badRows.length} rows were reported and skipped.`;
-    next = `/studio/import?notice=${encodeURIComponent(summary)}&bad=${encodeURIComponent(result.badRows.map((row) => `Line ${row.line}: ${row.reason}`).join("\n"))}`;
+    const result = importMembers(getDb(), staff.studioId, csv, mapping, { dryRun }, new Date());
+    if (!dryRun) refresh();
+    return {
+      result,
+      notice: dryRun
+        ? `Preview: ${result.preview.length} row${result.preview.length === 1 ? "" : "s"} ready, ${result.badRows.length} need a fix. Nothing was saved.`
+        : `Imported ${result.imported} member pass${result.imported === 1 ? "" : "es"}. ${result.badRows.length} row${result.badRows.length === 1 ? " was" : "s were"} skipped.`,
+    };
   } catch (error) {
-    fail("/studio/import", error);
+    return failure(error);
   }
-  redirect(next);
 }
 
-export async function emailExpiringAction() {
-  const staff = await currentStaff();
-  if (!staff) redirect("/login");
+export async function emailExpiringAction(): Promise<FormState> {
+  const staff = await requireStaff();
   const result = emailExpiring(getDb(), staff.studioId, new Date());
-  redirect(`/studio/reports?notice=${encodeURIComponent(`Queued ${result.queued}. Skipped ${result.skipped} who opted out.`)}`);
+  if (result.queued === 0 && result.skipped === 0) return { notice: "Everyone on this list has already been emailed." };
+  return {
+    notice: `Emailed ${result.queued} member${result.queued === 1 ? "" : "s"}.${result.skipped ? ` Skipped ${result.skipped} who turned reminders off.` : ""}`,
+  };
 }

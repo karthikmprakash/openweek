@@ -1,5 +1,5 @@
 {
-  "name": "StudioFlat",
+  "name": "Openweek",
   "avoid": ["Mindbody", "Punchpass", "Arketa", "Momence", "WellnessLiving", "Vagaro", "Glofox", "Acuity Scheduling", "ClassPass"],
   "domains": ["mindbodyonline.com", "mindbody.com", "punchpass.com", "arketa.com", "momence.com", "wellnessliving.com", "vagaro.com", "glofox.com"],
   "colors": [],

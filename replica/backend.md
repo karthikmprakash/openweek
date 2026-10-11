@@ -11,7 +11,7 @@
 - [x] owner can delete the studio
 - [ ] `npm audit` reports 5 high severity issues in the dependency tree (not triaged into a fix that keeps Next 16). See the final report.
 - [ ] Resend is not wired. The outbox is the send log until `RESEND_API_KEY` exists.
-- [ ] Daily backups are the operator's job. SQLite file is `STUDIOFLAT_DB` or `data/studioflat.db`.
+- [ ] Daily backups are the operator's job. SQLite file is `OPENWEEK_DB` or `data/openweek.db`.
 
 Stripe: direct charges with the `Stripe-Account` header when an `acct_` id is saved. `application_fee_amount` is absent from the create params. A non-zero fee on the response is refused.
 

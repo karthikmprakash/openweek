@@ -6,7 +6,7 @@ import { openDatabase, type Db } from "../src/lib/db";
 import { addSession, createClassType, updatePolicies } from "../src/lib/schedule";
 
 export function tempDb(): { db: Db; file: string; close: () => void } {
-  const file = path.join(os.tmpdir(), `studioflat-${crypto.randomUUID()}.db`);
+  const file = path.join(os.tmpdir(), `openweek-${crypto.randomUUID()}.db`);
   const db = openDatabase(file);
   return {
     db,
