@@ -12,7 +12,7 @@ describe("check-in", () => {
     open.push(handle);
     const now = new Date("2026-06-01T15:00:00.000Z");
     const studio = studioFixture(handle.db, now);
-    const { sessionId } = classOn(handle.db, studio.studioId, new Date("2026-06-02T16:00:00.000Z"), { capacity: 4 }, now);
+    const { sessionId } = classOn(handle.db, studio.studioId, new Date("2026-06-01T15:30:00.000Z"), { capacity: 4 }, now);
     const self = bookGuest(handle.db, { studioId: studio.studioId, sessionId, guestName: "Avery Lane", guestEmail: "avery@example.test" }, now);
     const staff = bookGuest(handle.db, { studioId: studio.studioId, sessionId, guestName: "Blair Chen", guestEmail: "blair@example.test" }, now);
 

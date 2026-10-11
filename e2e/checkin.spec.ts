@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { openStudio, publish, watchFailures } from "./support";
+import { openStudio, publish, soonLocalValue, watchFailures } from "./support";
 
 test("self check-in and staff check-in each record once", async ({ page }) => {
   const problems = watchFailures(page);
   const { slug } = await openStudio(page);
-  await publish(page, "Mat basics", "6");
+  await publish(page, "Mat basics", "6", soonLocalValue(25));
 
   await page.goto(`/s/${slug}`);
   await page.getByRole("link", { name: "Reserve" }).click();

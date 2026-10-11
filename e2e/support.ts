@@ -1,10 +1,15 @@
 import { randomBytes } from "crypto";
 import { expect, type Page } from "@playwright/test";
+import { toLocalInput } from "../src/lib/time";
 
 export function futureLocalValue() {
   const day = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
   const pad = (value: number) => String(value).padStart(2, "0");
   return `${day.getUTCFullYear()}-${pad(day.getUTCMonth() + 1)}-${pad(day.getUTCDate())}T09:00`;
+}
+
+export function soonLocalValue(minutes = 25) {
+  return toLocalInput(new Date(Date.now() + minutes * 60 * 1000), "America/Los_Angeles");
 }
 
 export async function openStudio(page: Page) {
@@ -24,12 +29,12 @@ export async function openStudio(page: Page) {
   return { slug, password };
 }
 
-export async function publish(page: Page, name: string, spots = "4") {
+export async function publish(page: Page, name: string, spots = "4", startsAt = futureLocalValue()) {
   await page.getByLabel("Class name").fill(name);
   await page.getByLabel("Minutes").fill("50");
   await page.getByLabel("Spots").fill(spots);
   await page.getByLabel("Drop-in price").fill("0");
-  await page.getByLabel("First session").fill(futureLocalValue());
+  await page.getByLabel("First session").fill(startsAt);
   await page.getByRole("button", { name: "Publish class" }).click();
   await expect(page.getByRole("heading", { name })).toBeVisible();
 }
