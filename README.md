@@ -55,7 +55,7 @@ Health: `GET /api/health`.
 
 ## Release
 
-GitHub Actions on `main` runs lint, types, unit tests, Playwright, and a Docker build. Pushing a tag `v0.1.0` creates a GitHub Release and publishes `ghcr.io/karthikmprakash/openweek:0.1.0`.
+GitHub Actions on `main` runs lint, types, unit tests, Playwright, and a Docker build for `linux/amd64` and `linux/arm64`. Pushing a tag `v0.1.0` creates a GitHub Release and publishes a multi-arch `ghcr.io/karthikmprakash/openweek:0.1.0`. Docker pulls the image that matches the host.
 
 ```bash
 git tag v0.1.0

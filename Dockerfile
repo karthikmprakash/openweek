@@ -1,4 +1,5 @@
 # syntax=docker/dockerfile:1
+# linux/amd64 and linux/arm64. better-sqlite3 compiles in the target arch.
 
 ARG NODE_VERSION=22-bookworm-slim
 
