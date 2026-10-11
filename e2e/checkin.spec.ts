@@ -17,6 +17,7 @@ test("self check-in and staff check-in each record once", async ({ page }) => {
   await expect(page.getByText("Checked in · self")).toHaveCount(1);
 
   await page.goto(`/s/${slug}`);
+  await page.getByRole("button", { name: "Not you? Forget this device" }).click();
   await page.getByRole("link", { name: "Reserve" }).click();
   await page.getByLabel("Name").fill("Blair Chen");
   await page.getByLabel("Email").fill("blair@example.test");
